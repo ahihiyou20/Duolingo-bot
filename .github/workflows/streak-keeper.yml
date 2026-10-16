@@ -41,7 +41,7 @@ jobs:
 
       - name: Run Practice
         env:
-          ENCRYPTION_KEY: b875ce755910adbe080437fd30fdaeefbf3b2538bb7be9304ea8c7ec424c2363
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
           PRACTICE_LANGUAGE: CHINESE
           HEADLESS: true
         run: pnpm practice
