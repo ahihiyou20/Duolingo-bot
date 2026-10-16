@@ -40,9 +40,19 @@ jobs:
           restore-keys: |
             state-${{ runner.os }}-
 
+      - name: Check ENCRYPTION_KEY secret
+        env:
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+        run: |
+          if [ -z "$ENCRYPTION_KEY" ]; then
+            echo "::error::ENCRYPTION_KEY secret is empty. Add it under Settings > Environments > ENCRYPTION_KEY > Environment secrets, or as a Repository secret (not Codespaces or Dependabot)."
+            exit 1
+          fi
+          echo "ENCRYPTION_KEY is set (length: ${#ENCRYPTION_KEY})"
+
       - name: Run Practice
         env:
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
-          PRACTICE_LANGUAGE: CHINESE
+          PRACTICE_LANGUAGE: Chinese
           HEADLESS: true
         run: pnpm practice

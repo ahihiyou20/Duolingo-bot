@@ -7,8 +7,9 @@ import { getStatePath, waitForLogin, ensureStateExists } from './utils/auth.js';
 import { startNetworkLogging, captureUserData } from './utils/network.js';
 import { solveVisibleTokens } from './utils/solver.js';
 import { startWordsLesson } from './utils/navigation.js';
-import { getCurrentLanguage, selectLanguage } from './utils/homepage.js';
+import { getCurrentLanguage, resolveLanguageName } from './utils/homepage.js';
 import { getBrowserConfig, getContextOptions } from './utils/browser.js';
+import { completePracticeViaApi, fetchStreakInfo, switchCourseViaApi } from './utils/api-practice.js';
 
 dotenv.config();
 
@@ -52,22 +53,50 @@ dotenv.config();
         }
 
         // Language Switch Logic
-        const targetLanguage = process.env.PRACTICE_LANGUAGE;
+        const logs = { userData, leaderboardData: null };
+        const currentLanguage = getCurrentLanguage(logs);
+        let targetLanguage = process.env.PRACTICE_LANGUAGE;
         if (targetLanguage) {
-            const currentLanguage = getCurrentLanguage({ userData, leaderboardData: null });
-
-            if (currentLanguage !== targetLanguage) {
-                console.log(`Current language: ${currentLanguage}`);
-                console.log(`Switching to ${targetLanguage}...`);
-                await selectLanguage(page, targetLanguage);
-            }
+            targetLanguage = resolveLanguageName(logs, targetLanguage);
         }
 
-        const sessionData = await startWordsLesson(page);
+        const targetCourse = userData.courses.find(c => c.title === (targetLanguage || currentLanguage))
+            ?? userData.courses.find(c => c.learningLanguage === userData.learningLanguage);
+
+        if (targetLanguage && currentLanguage !== targetLanguage) {
+            if (!targetCourse || targetCourse.title !== targetLanguage) {
+                console.error(`❌ Course "${process.env.PRACTICE_LANGUAGE}" not found. Available: ${userData.courses.map(c => c.title).filter(Boolean).join(', ')}`);
+                await browser.close();
+                process.exit(1);
+            }
+            console.log(`Current language: ${currentLanguage}`);
+            console.log(`Switching to ${targetLanguage}...`);
+            await switchCourseViaApi(page, userData.id, targetCourse.id, targetCourse.fromLanguage);
+            await page.goto('https://www.duolingo.com/learn', { waitUntil: 'domcontentloaded' });
+            await waitForLogin(page);
+        }
+
+        let sessionData = null;
+        try {
+            sessionData = await startWordsLesson(page);
+        } catch (e: any) {
+            console.warn(`⚠️  Words lesson not available: ${e.message?.split('\n')[0]}`);
+        }
+
         if (!sessionData || !sessionData.challenges) {
-            console.error('❌ Failed to capture session data.');
+            if (!targetCourse) {
+                console.error('❌ Failed to capture session data and could not determine the course.');
+                await browser.close();
+                process.exit(1);
+            }
+
+            const result = await completePracticeViaApi(page, targetCourse.fromLanguage, targetCourse.learningLanguage);
+            console.log(`✅ Practice completed via API. XP gained: ${result.xpGain ?? 'unknown'}`);
+
+            const streakInfo = await fetchStreakInfo(page, userData.id);
+            console.log(`Streak: ${streakInfo.streak} (last extended: ${streakInfo.lastExtendedDate})`);
             await browser.close();
-            process.exit(1);
+            process.exit(0);
         }
 
         fs.writeFileSync(path.join(logDir, 'session_data.json'), JSON.stringify(sessionData, null, 2));

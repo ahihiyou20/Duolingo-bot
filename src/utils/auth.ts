@@ -1,6 +1,7 @@
 import { Page } from 'playwright';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { decryptFile } from './crypto.js';
 
@@ -33,14 +34,25 @@ export function ensureStateExists(): string | null {
     const statePath = path.join(stateDir, 'storageState.json');
     const binPath = path.join(__dirname, '../../assets/state.bin');
 
-    if (fs.existsSync(statePath)) {
+    const hashPath = path.join(stateDir, '.state-bin.sha256');
+    const binHash = fs.existsSync(binPath)
+        ? crypto.createHash('sha256').update(fs.readFileSync(binPath)).digest('hex')
+        : null;
+    const lastHash = fs.existsSync(hashPath) ? fs.readFileSync(hashPath, 'utf8').trim() : null;
+
+    // A state restored from the CI cache must not shadow a newer committed state.bin.
+    // Locally (no hash recorded), keep an existing state so a fresh login isn't overwritten.
+    const binChanged = binHash !== null && (lastHash !== null || process.env.CI === 'true') && binHash !== lastHash;
+
+    if (fs.existsSync(statePath) && !binChanged) {
         return statePath;
     }
 
-    if (fs.existsSync(binPath)) {
-        console.log('ℹ️  State file missing, but encrypted backup found. Decrypting...');
+    if (binHash) {
+        console.log(binChanged ? 'ℹ️  assets/state.bin changed. Decrypting...' : 'ℹ️  State file missing, but encrypted backup found. Decrypting...');
         try {
             decryptFile(binPath, statePath);
+            fs.writeFileSync(hashPath, binHash);
             return statePath;
         } catch (e) {
             console.error('❌ Failed to decrypt state:', e);

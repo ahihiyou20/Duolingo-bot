@@ -30,6 +30,9 @@ To run the bot in GitHub Actions, you need to securely provide your authenticati
 2.  **Login locally**:
     - Run `pnpm run login-manual` to log in to Duolingo.
     - This will verify your credentials and save your session state locally.
+    - **Account linked to Google?** Google blocks sign-in from Playwright-controlled browsers ("This browser or app may not be secure"). Use one of these instead:
+        - `pnpm run login-chrome`: opens your installed Chrome/Edge as a normal (non-automated) browser with a dedicated profile in `state/browser-profile`. Log in with Google, then close the window (or press Enter in the terminal). The script then reads the session from that profile and saves it. Set `CHROME_PATH` in `.env` if your browser isn't found automatically.
+        - `pnpm run login-token`: log in at duolingo.com in your everyday browser, copy the `jwt_token` cookie (DevTools > Application > Cookies) and paste it when prompted (or pass it as an argument / `DUOLINGO_JWT` in `.env`).
 
 3.  **Encrypt your state**:
     - Run `pnpm run encrypt-state` to generate an encrypted version of your session (`assets/state.bin`).

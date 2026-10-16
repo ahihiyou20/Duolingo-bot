@@ -13,9 +13,10 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 const ALGORITHM = 'aes-256-gcm';
 
 function getKey(): Buffer {
-    const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+    // Trim: secrets pasted into GitHub often carry a trailing newline or spaces.
+    const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY?.trim().replace(/^["']|["']$/g, '');
     if (!ENCRYPTION_KEY) {
-        throw new Error('ENCRYPTION_KEY is not set in .env file');
+        throw new Error('ENCRYPTION_KEY is not set (locally: .env file; GitHub: repository secret under Settings > Secrets and variables > Actions).');
     }
 
     if (ENCRYPTION_KEY.length === 64 && /^[0-9a-fA-F]+$/.test(ENCRYPTION_KEY)) {
@@ -79,7 +80,12 @@ export function decryptFile(inputPath: string, outputPath: string): void {
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
     decipher.setAuthTag(authTag);
 
-    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+    let decrypted: Buffer;
+    try {
+        decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+    } catch {
+        throw new Error('Could not decrypt state.bin: ENCRYPTION_KEY does not match the key it was encrypted with. Re-run encrypt-state with the same key you stored as the secret.');
+    }
 
     fs.writeFileSync(outputPath, decrypted);
 }

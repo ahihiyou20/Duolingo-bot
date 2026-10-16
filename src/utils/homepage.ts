@@ -32,6 +32,18 @@ export function getCurrentLanguage(logs: NetworkLogs): string {
     return userData.learningLanguage || 'Unknown';
 }
 
+/**
+ * Maps a user-provided language name (e.g. "Chinese") to the exact course title
+ * (e.g. "Chinese (Simplified)"). Exact match first, then prefix match, case-insensitive.
+ */
+export function resolveLanguageName(logs: NetworkLogs, languageName: string): string {
+    const target = languageName.trim().toLowerCase();
+    const titles = getAvailableLanguages(logs);
+    return titles.find(t => t.toLowerCase() === target)
+        ?? titles.find(t => t.toLowerCase().startsWith(target))
+        ?? languageName;
+}
+
 export function getCurrentLanguageISO(logs: NetworkLogs): string {
     const userData = logs.userData;
     if (!userData) return 'unknown';
