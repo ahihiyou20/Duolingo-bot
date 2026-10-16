@@ -10,6 +10,7 @@ on:
 jobs:
   login:
     runs-on: ubuntu-latest
+    environment: ENCRYPTION_KEY
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
