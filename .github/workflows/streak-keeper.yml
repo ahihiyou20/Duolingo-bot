@@ -55,4 +55,17 @@ jobs:
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
           PRACTICE_LANGUAGE: Chinese
           HEADLESS: true
-        run: pnpm practice
+        run: |
+          # Retry on transient failures (slow runner, network hiccup) instead of needing a manual rerun.
+          for attempt in 1 2 3; do
+            echo "::group::Attempt $attempt"
+            if pnpm practice; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            echo "::warning::Attempt $attempt failed"
+            sleep 30
+          done
+          echo "::error::Practice failed after 3 attempts"
+          exit 1

@@ -7,7 +7,7 @@ import { getStatePath, waitForLogin, ensureStateExists } from './utils/auth.js';
 import { startNetworkLogging, captureUserData } from './utils/network.js';
 import { solveVisibleTokens } from './utils/solver.js';
 import { startWordsLesson } from './utils/navigation.js';
-import { getCurrentLanguage, resolveLanguageName } from './utils/homepage.js';
+import { getCurrentLanguage, getTodaysStreakCompleted, resolveLanguageName } from './utils/homepage.js';
 import { getBrowserConfig, getContextOptions } from './utils/browser.js';
 import { completePracticeViaApi, fetchStreakInfo, switchCourseViaApi } from './utils/api-practice.js';
 
@@ -36,7 +36,7 @@ dotenv.config();
 
         await startNetworkLogging(page, logDir);
 
-        const userDataPromise = captureUserData(page);
+        const userDataPromise = captureUserData(page, 30000); // resolves as soon as data arrives; CI runners can be slow
         await page.goto('https://www.duolingo.com/learn', { waitUntil: 'domcontentloaded' });
 
         if (!await waitForLogin(page)) {
@@ -96,6 +96,13 @@ dotenv.config();
             const streakInfo = await fetchStreakInfo(page, userData.id);
             console.log(`Streak: ${streakInfo.streak} (last extended: ${streakInfo.lastExtendedDate})`);
             await browser.close();
+
+            // Don't report success unless Duolingo actually counted today.
+            const extendedToday = getTodaysStreakCompleted({ userData: { ...userData, streakData: streakInfo.streakData }, leaderboardData: null });
+            if (!extendedToday) {
+                console.error('❌ Practice finished but the streak was not extended today.');
+                process.exit(1);
+            }
             process.exit(0);
         }
 

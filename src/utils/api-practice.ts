@@ -98,7 +98,7 @@ export async function switchCourseViaApi(page: Page, userId: number, courseId: s
 /**
  * Fetches the user's current streak info fresh from the API.
  */
-export async function fetchStreakInfo(page: Page, userId: number): Promise<{ streak: number; lastExtendedDate: string | null }> {
+export async function fetchStreakInfo(page: Page, userId: number): Promise<{ streak: number; lastExtendedDate: string | null; streakData: any }> {
     return await page.evaluate(async (userId) => {
         const jwt = document.cookie.split('; ').find(c => c.startsWith('jwt_token='))?.split('=')[1];
         const res = await fetch(`https://www.duolingo.com/2017-06-30/users/${userId}?fields=streak,streakData`, {
@@ -109,6 +109,7 @@ export async function fetchStreakInfo(page: Page, userId: number): Promise<{ str
         return {
             streak: json.streak,
             lastExtendedDate: json.streakData?.currentStreak?.lastExtendedDate ?? null,
+            streakData: json.streakData,
         };
     }, userId);
 }
